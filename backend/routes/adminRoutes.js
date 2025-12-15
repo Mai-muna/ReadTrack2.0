@@ -1,5 +1,7 @@
 const express = require('express');
 const { protect, adminOnly } = require('../middleware/authMiddleware');
+const { param, body } = require('express-validator');
+const validate = require('../middleware/validationMiddleware');
 const {
   banUser,
   unbanUser,
