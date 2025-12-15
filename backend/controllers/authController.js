@@ -31,6 +31,7 @@ exports.loginUser = async (req, res) => {
 
     const user = await User.findOne({ email });
     if (!user) return res.status(401).json({ message: 'Invalid credentials' });
+    if (user.isBanned) return res.status(403).json({ message: 'Account is banned' });
 
     const isMatch = await user.matchPassword(password);
     if (!isMatch) return res.status(401).json({ message: 'Invalid credentials' });
@@ -49,4 +50,9 @@ exports.getAllUsers = async (req, res) => {
   } catch (err) {
     res.status(500).json({ message: 'Failed to fetch users' });
   }
+};
+
+exports.listUsersLite = async (_req, res) => {
+  const users = await User.find().select('name email role isBanned followers following');
+  res.json(users);
 };

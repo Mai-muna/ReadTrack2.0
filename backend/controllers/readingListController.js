@@ -44,6 +44,12 @@ exports.addToReadingList = async (req, res) => {
     const newEntry = { book: new mongoose.Types.ObjectId(bookId), status: status || "wantToRead", addedAt: new Date() };
     user.readingList.push(newEntry);
 
+    await ReadingList.findOneAndUpdate(
+      { user: req.user._id, book: bookId },
+      { $set: { status: status || "wantToRead", progress: 0, lastUpdated: new Date() } },
+      { upsert: true, new: true }
+    );
+
     await user.save();
     res.status(201).json({ message: "Book added to reading list", added: newEntry });
   } catch (error) {
@@ -61,18 +67,24 @@ exports.updateReadingStatus = async (req, res) => {
     if (!validStatus.includes(status)) return res.status(400).json({ message: "Invalid status" });
 
     if (!req.user) return res.status(401).json({ message: "User not authenticated" });
-    if (!mongoose.Types.ObjectId.isValid(bookId)) return res.status(400).json({ message: "Invalid Book ID" });
+  if (!mongoose.Types.ObjectId.isValid(bookId)) return res.status(400).json({ message: "Invalid Book ID" });
 
-    const user = await User.findById(req.user._id);
-    if (!user) return res.status(404).json({ message: "User not found" });
+  const user = await User.findById(req.user._id);
+  if (!user) return res.status(404).json({ message: "User not found" });
 
     const item = user.readingList.find(entry => entry.book && entry.book.toString() === bookId);
     if (!item) return res.status(404).json({ message: "Book not in reading list" });
 
-    item.status = status;
-    await user.save();
+  item.status = status;
+  await user.save();
 
-    res.json({ message: "Reading status updated" });
+  await ReadingList.findOneAndUpdate(
+    { user: req.user._id, book: bookId },
+    { $set: { status, lastUpdated: new Date() } },
+    { upsert: true }
+  );
+
+  res.json({ message: "Reading status updated" });
   } catch (error) {
     console.error("UpdateReadingStatus Error:", error);
     res.status(500).json({ message: error.message });
@@ -98,6 +110,7 @@ exports.removeFromReadingList = async (req, res) => {
     }
 
     await user.save();
+    await ReadingList.findOneAndDelete({ user: req.user._id, book: bookId });
     res.json({ message: "Book removed from reading list" });
   } catch (error) {
     console.error("RemoveFromReadingList Error:", error);
@@ -113,7 +126,22 @@ exports.getReadingList = async (req, res) => {
     const user = await User.findById(req.user._id).populate("readingList.book");
     if (!user) return res.status(404).json({ message: "User not found" });
 
-    res.json(user.readingList);
+    const progressMap = await ReadingList.find({ user: req.user._id }).lean();
+    const byBook = progressMap.reduce((acc, entry) => {
+      acc[entry.book.toString()] = entry;
+      return acc;
+    }, {});
+
+    const combined = user.readingList.map((entry) => {
+      const tracking = byBook[entry.book?._id?.toString()] || {};
+      return {
+        ...entry.toObject(),
+        progress: tracking.progress || 0,
+        lastUpdated: tracking.lastUpdated,
+      };
+    });
+
+    res.json(combined);
   } catch (error) {
     console.error("GetReadingList Error:", error);
     res.status(500).json({ message: error.message });
@@ -126,18 +154,19 @@ exports.updateProgress = async (req, res) => {
   if (progress < 0 || progress > 100)
     return res.status(400).json({ message: "Progress must be 0–100" });
 
-  const entry = await ReadingList.findOne({
-    user: req.user.id,
-    book: bookId
-  });
+  const entry = await ReadingList.findOneAndUpdate(
+    { user: req.user.id, book: bookId },
+    {
+      $set: {
+        progress,
+        ...(progress === 100 ? { status: "finished" } : {}),
+        lastUpdated: Date.now()
+      }
+    },
+    { new: true }
+  );
 
   if (!entry) return res.status(404).json({ message: "Book not found" });
 
-  entry.progress = progress;
-  entry.lastUpdated = Date.now();
-
-  if (progress === 100) entry.status = "finished";
-
-  await entry.save();
   res.json({ message: "Progress updated", entry });
 };

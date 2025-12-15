@@ -23,7 +23,16 @@ exports.getUserStats = async (req, res) => {
 
     res.json({
       user: userId,
-      stats
+      stats,
+      topGenre: await ReadingList.aggregate([
+        { $match: { user: new mongoose.Types.ObjectId(userId) } },
+        { $lookup: { from: 'books', localField: 'book', foreignField: '_id', as: 'book' } },
+        { $unwind: '$book' },
+        { $unwind: '$book.genres' },
+        { $group: { _id: '$book.genres', count: { $sum: 1 } } },
+        { $sort: { count: -1 } },
+        { $limit: 1 }
+      ])
     });
 
   } catch (err) {
