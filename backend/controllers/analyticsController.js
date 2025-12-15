@@ -57,20 +57,3 @@ exports.getAdminStats = async (req, res) => {
         }
       }
     ]);
-
-    res.json({
-      systemStats: {
-        totalUsers,
-        totalBooks,
-        totalReviews
-      },
-      readingListBreakdown
-    });
-
-  } catch (err) {
-    res.status(500).json({
-      message: "Failed to fetch admin analytics",
-      error: err.message
-    });
-  }
-};
