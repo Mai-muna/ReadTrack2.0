@@ -31,6 +31,7 @@ app.use('/api/reading-list', readingListRoutes);
 app.use('/api/reviews', reviewRoutes);
 app.use('/api/recommendations', recommendationRoutes);
 app.use('/api/social', socialRoutes);
+app.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 100 }));
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/export', exportRoutes);

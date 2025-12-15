@@ -149,35 +149,24 @@ exports.getReadingList = async (req, res) => {
 };
 
 exports.updateProgress = async (req, res) => {
-  try {
-    const { bookId, progress } = req.body;
+  const { bookId, progress } = req.body;
 
-    const entry = await ReadingList.findOneAndUpdate(
-      { user: req.user.id, book: bookId },
-      {
-        $set: {
-          progress,
-          ...(progress === 100 ? { status: "finished" } : {}),
-          lastUpdated: Date.now()
-        }
-      },
-      { new: true }
-    );
+  if (progress < 0 || progress > 100)
+    return res.status(400).json({ message: "Progress must be 0–100" });
 
-    if (!entry) return res.status(404).json({ message: "Book not found" });
-
-    await User.updateOne(
-      { _id: req.user.id, "readingList.book": bookId },
-      {
-        $set: {
-          "readingList.$.status": progress === 100 ? "finished" : entry.status || "currentlyReading",
-          "readingList.$.updatedAt": new Date()
-        }
+  const entry = await ReadingList.findOneAndUpdate(
+    { user: req.user.id, book: bookId },
+    {
+      $set: {
+        progress,
+        ...(progress === 100 ? { status: "finished" } : {}),
+        lastUpdated: Date.now()
       }
-    );
+    },
+    { new: true }
+  );
 
-    res.json({ message: "Progress updated", entry });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
+  if (!entry) return res.status(404).json({ message: "Book not found" });
+
+  res.json({ message: "Progress updated", entry });
 };

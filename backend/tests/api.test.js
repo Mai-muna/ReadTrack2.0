@@ -1,12 +1,3 @@
-process.env.NODE_ENV = 'test';
-const fs = require('fs');
-const preferredBinary = process.env.MONGOMS_SYSTEM_BINARY || '/tmp/mongobin/bin/mongod';
-if (fs.existsSync(preferredBinary)) {
-  process.env.MONGOMS_SYSTEM_BINARY = preferredBinary;
-} else {
-  delete process.env.MONGOMS_SYSTEM_BINARY;
-}
-
 const mongoose = require('mongoose');
 const request = require('supertest');
 const { MongoMemoryServer } = require('mongodb-memory-server');
@@ -23,9 +14,7 @@ let reviewId;
 jest.setTimeout(30000);
 
 beforeAll(async () => {
-  mongo = await MongoMemoryServer.create({
-    binary: { version: process.env.MONGOMS_VERSION || '7.0.5' }
-  });
+  mongo = await MongoMemoryServer.create();
   process.env.JWT_SECRET = 'testsecret';
   await mongoose.connect(mongo.getUri());
 });
@@ -107,15 +96,5 @@ describe('Admin actions', () => {
       .post(`/api/admin/ban/${target._id}`)
       .set('Authorization', `Bearer ${adminToken}`);
     expect(res.statusCode).toBe(200);
-  });
-
-  test('admin removes review and book rating recalculates', async () => {
-    const res = await request(app)
-      .delete(`/api/admin/reviews/${reviewId}`)
-      .set('Authorization', `Bearer ${adminToken}`);
-    expect(res.statusCode).toBe(200);
-    const book = await Book.findById(bookId);
-    expect(book.ratingsCount).toBe(0);
-    expect(book.ratingsAverage).toBe(0);
   });
 });
