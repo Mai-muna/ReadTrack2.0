@@ -2,6 +2,7 @@ const mongoose = require("mongoose");
 const User = require("../models/User");
 const Book = require("../models/Book");
 const ReadingList = require("../models/ReadingList");
+
 // ✅ Add a book to reading list
 exports.addToReadingList = async (req, res) => {
   try {
@@ -21,18 +22,15 @@ exports.addToReadingList = async (req, res) => {
 
     const user = await User.findById(req.user._id);
     if (!user) return res.status(404).json({ message: "User not found" });
+
     // Migrate legacy entries where readingList stored ObjectIds directly
     user.readingList = user.readingList.map(entry => {
-      // If entry already has a `book` field, leave it
       if (entry && entry.book) return entry;
-      // If entry looks like an ObjectId (string or ObjectId instance), convert it
       try {
         if (mongoose.Types.ObjectId.isValid(entry)) {
           return { book: entry, status: 'wantToRead', addedAt: new Date() };
         }
-      } catch (e) {
-        // ignore and keep original
-      }
+      } catch (e) { }
       return entry;
     });
 
@@ -40,7 +38,6 @@ exports.addToReadingList = async (req, res) => {
     const exists = user.readingList.some(entry => entry.book && entry.book.toString() === bookId);
     if (exists) return res.status(400).json({ message: "Book already in reading list" });
 
-    // Push object matching schema
     const newEntry = { book: new mongoose.Types.ObjectId(bookId), status: status || "wantToRead", addedAt: new Date() };
     user.readingList.push(newEntry);
 
@@ -64,27 +61,29 @@ exports.updateReadingStatus = async (req, res) => {
     const { bookId, status } = req.body;
 
     const validStatus = ["wantToRead", "currentlyReading", "finished"];
-    if (!validStatus.includes(status)) return res.status(400).json({ message: "Invalid status" });
+    if (!status || !validStatus.includes(status)) {
+      return res.status(400).json({ message: "Invalid or missing status" });
+    }
 
     if (!req.user) return res.status(401).json({ message: "User not authenticated" });
-  if (!mongoose.Types.ObjectId.isValid(bookId)) return res.status(400).json({ message: "Invalid Book ID" });
+    if (!mongoose.Types.ObjectId.isValid(bookId)) return res.status(400).json({ message: "Invalid Book ID" });
 
-  const user = await User.findById(req.user._id);
-  if (!user) return res.status(404).json({ message: "User not found" });
+    const user = await User.findById(req.user._id);
+    if (!user) return res.status(404).json({ message: "User not found" });
 
     const item = user.readingList.find(entry => entry.book && entry.book.toString() === bookId);
     if (!item) return res.status(404).json({ message: "Book not in reading list" });
 
-  item.status = status;
-  await user.save();
+    item.status = status;
+    await user.save();
 
-  await ReadingList.findOneAndUpdate(
-    { user: req.user._id, book: bookId },
-    { $set: { status, lastUpdated: new Date() } },
-    { upsert: true }
-  );
+    await ReadingList.findOneAndUpdate(
+      { user: req.user._id, book: bookId },
+      { $set: { status, lastUpdated: new Date() } },
+      { upsert: true }
+    );
 
-  res.json({ message: "Reading status updated" });
+    res.json({ message: "Reading status updated" });
   } catch (error) {
     console.error("UpdateReadingStatus Error:", error);
     res.status(500).json({ message: error.message });
@@ -137,7 +136,7 @@ exports.getReadingList = async (req, res) => {
       return {
         ...entry.toObject(),
         progress: tracking.progress || 0,
-        lastUpdated: tracking.lastUpdated,
+        lastUpdated: tracking.lastUpdated || null,
       };
     });
 
@@ -148,9 +147,14 @@ exports.getReadingList = async (req, res) => {
   }
 };
 
+// ✅ Update Progress
 exports.updateProgress = async (req, res) => {
   try {
     const { bookId, progress } = req.body;
+
+    if (progress < 0 || progress > 100) {
+      return res.status(400).json({ message: "Progress must be 0–100" });
+    }
 
     const entry = await ReadingList.findOneAndUpdate(
       { user: req.user.id, book: bookId },
@@ -158,13 +162,14 @@ exports.updateProgress = async (req, res) => {
         $set: {
           progress,
           ...(progress === 100 ? { status: "finished" } : {}),
-          lastUpdated: Date.now()
+          lastUpdated: Date.now(),
+          ...(progress === 100 ? { finishedAt: new Date() } : {})
         }
       },
       { new: true }
     );
 
-    if (!entry) return res.status(404).json({ message: "Book not found" });
+    if (!entry) return res.status(404).json({ message: "Book not found in reading list" });
 
     await User.updateOne(
       { _id: req.user.id, "readingList.book": bookId },
@@ -180,24 +185,4 @@ exports.updateProgress = async (req, res) => {
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
-  const { bookId, progress } = req.body;
-
-  if (progress < 0 || progress > 100)
-    return res.status(400).json({ message: "Progress must be 0–100" });
-
-  const entry = await ReadingList.findOneAndUpdate(
-    { user: req.user.id, book: bookId },
-    {
-      $set: {
-        progress,
-        ...(progress === 100 ? { status: "finished" } : {}),
-        lastUpdated: Date.now()
-      }
-    },
-    { new: true }
-  );
-
-  if (!entry) return res.status(404).json({ message: "Book not found" });
-
-  res.json({ message: "Progress updated", entry });
 };

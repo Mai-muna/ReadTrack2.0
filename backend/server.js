@@ -9,7 +9,7 @@ const readingListRoutes = require('./routes/readingListRoutes');
 const reviewRoutes = require('./routes/reviewRoutes');
 const recommendationRoutes = require('./routes/recommendationRoutes');
 const socialRoutes = require('./routes/socialRoutes');
-const rateLimit = require("express-rate-limit");
+const rateLimit = require('express-rate-limit');
 const analyticsRoutes = require('./routes/analyticsRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const exportRoutes = require('./routes/exportRoutes');
@@ -17,7 +17,14 @@ const exportRoutes = require('./routes/exportRoutes');
 const app = express();
 app.use(express.json());
 app.use(cors());
-app.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 100 }));
+
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 100,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: "Too many requests, please try again later." }
+});
 
 if (process.env.NODE_ENV !== 'test') {
   mongoose.connect(process.env.MONGO_URI)
@@ -31,7 +38,7 @@ app.use('/api/reading-list', readingListRoutes);
 app.use('/api/reviews', reviewRoutes);
 app.use('/api/recommendations', recommendationRoutes);
 app.use('/api/social', socialRoutes);
-app.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 100 }));
+app.use("/api", apiLimiter);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/export', exportRoutes);

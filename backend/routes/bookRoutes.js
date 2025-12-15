@@ -3,8 +3,11 @@ const router = express.Router();
 const bookController = require('../controllers/bookController'); // ensure you have controller
 const { protect, adminOnly } = require('../middleware/authMiddleware');
 
-router.get('/top/list', bookController.getTopBooks);
-router.get('/recent/list', bookController.getRecentBooks);
+console.log(bookController);
+console.log('bookController.getTopRatedBooks:', bookController.getTopRatedBooks);
+
+router.get('/top/list', bookController.getTopRatedBooks);
+router.get('/recent/list', bookController.getRecentlyAddedBooks);
 router.get('/', bookController.getBooks);
 router.get('/:id', bookController.getBookById);
 
