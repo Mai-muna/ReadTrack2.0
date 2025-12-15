@@ -27,7 +27,7 @@ exports.createBook = async (req, res) => {
 // GET ALL BOOKS (PUBLIC)
 exports.getBooks = async (req, res) => {
   try {
-    const { q, author, genre, page = 1, limit = 20, sortBy } = req.query;
+    const { q, author, genre, page = 1, limit = 20, sortBy, minRating } = req.query;
     const filter = {};
 
     if (q) {
@@ -37,6 +37,10 @@ exports.getBooks = async (req, res) => {
     }
     if (author) filter.author = new RegExp(author, 'i');
     if (genre) filter.genres = { $in: [genre] };
+
+    if (minRating) {
+      filter.ratingsAverage = { $gte: Number(minRating) };
+    }
 
     let query = Book.find(filter);
 
@@ -98,4 +102,16 @@ exports.deleteBook = async (req, res) => {
   } catch (error) {
     res.status(500).json({ message: "Error deleting book", error: error.message });
   }
+};
+
+// Top rated books
+exports.getTopBooks = async (_req, res) => {
+  const books = await Book.find().sort({ ratingsAverage: -1 }).limit(10);
+  res.json(books);
+};
+
+// Recently added books
+exports.getRecentBooks = async (_req, res) => {
+  const books = await Book.find().sort({ createdAt: -1 }).limit(10);
+  res.json(books);
 };

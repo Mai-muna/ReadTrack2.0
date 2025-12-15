@@ -1,9 +1,11 @@
 import { useState } from "react";
 import api from "../api/api";
+import { useAuth } from "../AuthContext";
 
 export default function Login() {
   const [form, setForm] = useState({ email: "", password: "" });
   const [message, setMessage] = useState("");
+  const { login } = useAuth();
 
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -13,7 +15,7 @@ export default function Login() {
     e.preventDefault();
     try {
       const res = await api.post("/auth/login", form);
-      localStorage.setItem("token", res.data.token);
+      login(res.data.token, res.data.user);
       setMessage("Login successful! Token saved ✅");
     } catch (error) {
       setMessage(error.response?.data?.message || "Error logging in");
