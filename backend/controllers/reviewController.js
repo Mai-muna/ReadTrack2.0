@@ -58,6 +58,23 @@ exports.getReviewsForBook = async (req, res) => {
   }
 };
 
+// Edit a review
+exports.updateReview = async (req, res) => {
+  const { id } = req.params;
+  const { rating, title, comment } = req.body;
+  const review = await Review.findById(id);
+  if (!review) return res.status(404).json({ message: 'Review not found' });
+  if (req.user.role !== 'admin' && review.user.toString() !== req.user.id) {
+    return res.status(403).json({ message: 'Not authorized' });
+  }
+  if (rating) review.rating = rating;
+  if (title !== undefined) review.title = title;
+  if (comment !== undefined) review.comment = comment;
+  await review.save();
+  await updateBookRatings(review.book);
+  res.json({ message: 'Review updated', review });
+};
+
 // Delete a Review (Only owner or admin)
 exports.deleteReview = async (req, res) => {
   try {

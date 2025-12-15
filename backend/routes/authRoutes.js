@@ -1,7 +1,7 @@
 const express = require('express');
 const { body } = require('express-validator');
 const router = express.Router();
-const { registerUser, loginUser } = require('../controllers/authController');
+const { registerUser, loginUser, listUsersLite } = require('../controllers/authController');
 const { protect, adminOnly } = require('../middleware/authMiddleware');
 const { getAllUsers } = require('../controllers/authController');
 
@@ -24,6 +24,7 @@ router.get('/profile', protect, (req, res) => {
 });
 
 router.get('/admin/users', protect, adminOnly, getAllUsers);
+router.get('/users', protect, listUsersLite);
 
 router.get('/admin/check', protect, adminOnly, (req, res) => {
   res.json({ message: 'Admin verified' });

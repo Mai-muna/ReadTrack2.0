@@ -21,4 +21,7 @@ router.get('/book/:id', reviewController.getReviewsForBook);
 // Delete Review (Only User Who Posted or Admin)
 router.delete('/:id', protect, reviewController.deleteReview);
 
+// Update review
+router.put('/:id', protect, reviewController.updateReview);
+
 module.exports = router;
