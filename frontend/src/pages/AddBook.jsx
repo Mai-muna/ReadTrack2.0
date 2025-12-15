@@ -4,39 +4,41 @@ import api from "../api/api";
 
 export default function AddBook() {
   const navigate = useNavigate();
-
   const [form, setForm] = useState({
     title: "",
     author: "",
-    description: "",
-    genre: "",
+    genresText: "", // comma separated
+    synopsis: "",
+    coverUrl: ""
   });
-
   const [message, setMessage] = useState("");
 
-  // Handle input fields
   const handleChange = (e) => {
-    setForm({
-      ...form,
-      [e.target.name]: e.target.value,
-    });
+    setForm({ ...form, [e.target.name]: e.target.value });
   };
 
-  // Handle form submission
   const handleSubmit = async (e) => {
     e.preventDefault();
     setMessage("");
 
+    const payload = {
+      title: form.title,
+      author: form.author,
+      genres: form.genresText
+        .split(",")
+        .map((g) => g.trim())
+        .filter(Boolean),
+      synopsis: form.synopsis,
+      coverUrl: form.coverUrl
+    };
+
     try {
-      const res = await api.post("/books", form); // Backend API call
-      console.log("Book added:", res.data);
-
+      await api.post("/books", payload);
       setMessage("✅ Book added successfully!");
-
-      setTimeout(() => navigate("/books"), 1000); // Redirect after 1 sec
+      setTimeout(() => navigate("/books"), 800);
     } catch (err) {
       console.error("Error adding book:", err);
-      setMessage("❌ Failed to add book. Check console.");
+      setMessage(err.response?.data?.message || "❌ Failed to add book.");
     }
   };
 
@@ -46,63 +48,26 @@ export default function AddBook() {
 
       <form
         onSubmit={handleSubmit}
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          gap: "10px",
-          marginTop: "20px",
-        }}
+        style={{ display: "flex", flexDirection: "column", gap: "10px", marginTop: "20px" }}
       >
+        <input name="title" placeholder="Book Title" value={form.title} onChange={handleChange} required />
+        <input name="author" placeholder="Author" value={form.author} onChange={handleChange} required />
         <input
-          type="text"
-          name="title"
-          placeholder="Book Title"
-          value={form.title}
+          name="genresText"
+          placeholder="Genres (comma separated) e.g. Fantasy, Sci-Fi"
+          value={form.genresText}
           onChange={handleChange}
-          required
-          style={{ padding: "10px" }}
         />
-
-        <input
-          type="text"
-          name="author"
-          placeholder="Author"
-          value={form.author}
-          onChange={handleChange}
-          required
-          style={{ padding: "10px" }}
-        />
-
-        <input
-          type="text"
-          name="genre"
-          placeholder="Genre"
-          value={form.genre}
-          onChange={handleChange}
-          required
-          style={{ padding: "10px" }}
-        />
-
+        <input name="coverUrl" placeholder="Cover URL (optional)" value={form.coverUrl} onChange={handleChange} />
         <textarea
-          name="description"
-          placeholder="Short Description"
-          value={form.description}
+          name="synopsis"
+          placeholder="Synopsis"
+          value={form.synopsis}
           onChange={handleChange}
           rows="4"
           required
-          style={{ padding: "10px" }}
-        ></textarea>
-
-        <button
-          type="submit"
-          style={{
-            padding: "10px",
-            background: "green",
-            color: "white",
-            border: "none",
-            cursor: "pointer",
-          }}
-        >
+        />
+        <button type="submit" style={{ padding: "10px", background: "green", color: "white", border: "none" }}>
           Add Book
         </button>
       </form>
