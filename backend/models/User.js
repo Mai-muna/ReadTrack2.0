@@ -5,7 +5,7 @@ const userSchema = new mongoose.Schema({
   name: { type: String, required: true, trim: true },
   email: { type: String, required: true, unique: true, lowercase: true, trim: true },
   password: { type: String, required: true },
-  role: { type: String, enum: ['user','admin'], default: 'user' },
+  role: { type: String, enum: ['user', 'admin'], default: 'user' },
   isBanned: { type: Boolean, default: false },
   followers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
   following: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
@@ -20,7 +20,11 @@ const userSchema = new mongoose.Schema({
       },
       addedAt: { type: Date, default: Date.now }
     }
-  ]
+  ],
+  yearlyGoal: [{
+    year: { type: Number, default: new Date().getFullYear() },
+    target: { type: Number, default: 0 }
+  }]
 });
 
 // Hash password before save
@@ -41,4 +45,3 @@ userSchema.methods.matchPassword = async function(plain){
 };
 
 module.exports = mongoose.model('User', userSchema);
-

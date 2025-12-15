@@ -1,117 +1,126 @@
-const Book = require('../models/Book');
+const mongoose = require("mongoose");
+const Book = require("../models/Book");
+const User = require("../models/User");
 
-// CREATE A BOOK (ADMIN ONLY)
+// ✅ Create new book
 exports.createBook = async (req, res) => {
   try {
     const { title, author, genres, synopsis, coverUrl } = req.body;
 
-    if (!title || !author) {
-      return res.status(400).json({ message: "Title and author are required" });
-    }
+    if (!title || !author) return res.status(400).json({ message: "Title and author are required" });
 
-    const book = await Book.create({
+    // If genres is a string (legacy support), convert it into an array
+    const genreArray = Array.isArray(genres) ? genres : genres ? [genres] : [];
+
+    const newBook = new Book({
       title,
       author,
-      genres: genres || [],
-      synopsis: synopsis || "",
-      coverUrl: coverUrl || "",
-      createdBy: req.user.id
+      genres: genreArray,
+      synopsis,
+      coverUrl,
     });
 
-    res.status(201).json({ message: "Book created", book });
+    await newBook.save();
+    res.status(201).json({ message: "Book created", book: newBook });
   } catch (error) {
-    res.status(500).json({ message: "Error creating book", error: error.message });
+    res.status(500).json({ message: error.message });
   }
 };
 
-// GET ALL BOOKS (PUBLIC)
+// ✅ Update book details
+exports.updateBook = async (req, res) => {
+  try {
+    const bookId = req.params.id;
+    const { title, author, genres, synopsis, coverUrl } = req.body;
+
+    const genreArray = Array.isArray(genres) ? genres : genres ? [genres] : [];
+
+    const updatedBook = await Book.findByIdAndUpdate(
+      bookId,
+      { title, author, genres: genreArray, synopsis, coverUrl },
+      { new: true }
+    );
+
+    if (!updatedBook) return res.status(404).json({ message: "Book not found" });
+
+    res.json({ message: "Book updated", book: updatedBook });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// ✅ Delete a book
+exports.deleteBook = async (req, res) => {
+  try {
+    const bookId = req.params.id;
+
+    const deletedBook = await Book.findByIdAndDelete(bookId);
+
+    if (!deletedBook) return res.status(404).json({ message: "Book not found" });
+
+    res.json({ message: "Book deleted", book: deletedBook });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// ✅ Get a list of books
 exports.getBooks = async (req, res) => {
   try {
-    const { q, author, genre, page = 1, limit = 20, sortBy, minRating } = req.query;
-    const filter = {};
+    const { q, author, genre, minRating } = req.query;
+
+    let filter = {};
 
     if (q) {
-      // text search on title and synopsis and author
-      const regex = new RegExp(q, 'i');
-      filter.$or = [{ title: regex }, { synopsis: regex }, { author: regex }];
+      filter.title = { $regex: q, $options: "i" };  // Case-insensitive search
     }
-    if (author) filter.author = new RegExp(author, 'i');
-    if (genre) filter.genres = { $in: [genre] };
-
+    if (author) {
+      filter.author = { $regex: author, $options: "i" };
+    }
+    if (genre) {
+      filter.genres = { $in: [genre] };
+    }
     if (minRating) {
-      filter.ratingsAverage = { $gte: Number(minRating) };
+      filter.ratingsAverage = { $gte: minRating };
     }
 
-    let query = Book.find(filter);
-
-    // sorting
-    if (sortBy === 'rating') query = query.sort({ ratingsAverage: -1 });
-    else if (sortBy === 'newest') query = query.sort({ createdAt: -1 });
-    else query = query.sort({ title: 1 });
-
-    // pagination
-    const skip = (Number(page) - 1) * Number(limit);
-    query = query.skip(skip).limit(Number(limit));
-
-    const books = await query.exec();
+    const books = await Book.find(filter);
     res.json(books);
-  } catch (err) {
-    res.status(500).json({ message: 'Server error', error: err.message });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
   }
 };
 
-// GET SINGLE BOOK (PUBLIC)
+// ✅ Get book details by ID
 exports.getBookById = async (req, res) => {
   try {
-    const book = await Book.findById(req.params.id);
+    const bookId = req.params.id;
+    const book = await Book.findById(bookId);
+
     if (!book) return res.status(404).json({ message: "Book not found" });
 
     res.json(book);
   } catch (error) {
-    res.status(500).json({ message: "Error fetching book", error: error.message });
+    res.status(500).json({ message: error.message });
   }
 };
 
-// UPDATE BOOK (ADMIN ONLY)
-exports.updateBook = async (req, res) => {
+// ✅ Get top-rated books
+exports.getTopRatedBooks = async (req, res) => {
   try {
-    const updates = req.body;
-
-    const book = await Book.findByIdAndUpdate(
-      req.params.id,
-      updates,
-      { new: true }
-    );
-
-    if (!book) return res.status(404).json({ message: "Book not found" });
-
-    res.json({ message: "Book updated", book });
+    const topBooks = await Book.find().sort({ ratingsAverage: -1 }).limit(10);
+    res.json(topBooks);
   } catch (error) {
-    res.status(500).json({ message: "Error updating book", error: error.message });
+    res.status(500).json({ message: error.message });
   }
 };
 
-// DELETE BOOK (ADMIN ONLY)
-exports.deleteBook = async (req, res) => {
+// ✅ Get recently added books
+exports.getRecentlyAddedBooks = async (req, res) => {
   try {
-    const book = await Book.findByIdAndDelete(req.params.id);
-
-    if (!book) return res.status(404).json({ message: "Book not found" });
-
-    res.json({ message: "Book deleted" });
+    const recentBooks = await Book.find().sort({ createdAt: -1 }).limit(10);
+    res.json(recentBooks);
   } catch (error) {
-    res.status(500).json({ message: "Error deleting book", error: error.message });
+    res.status(500).json({ message: error.message });
   }
-};
-
-// Top rated books
-exports.getTopBooks = async (_req, res) => {
-  const books = await Book.find().sort({ ratingsAverage: -1 }).limit(10);
-  res.json(books);
-};
-
-// Recently added books
-exports.getRecentBooks = async (_req, res) => {
-  const books = await Book.find().sort({ createdAt: -1 }).limit(10);
-  res.json(books);
 };

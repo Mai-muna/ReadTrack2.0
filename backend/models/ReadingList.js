@@ -27,7 +27,8 @@ const readingListSchema = new mongoose.Schema({
     lastUpdated: {
       type: Date,
       default: Date.now
-    }
+    },
+    finishedAt: { type: Date }
   },
   { timestamps: true }
 );
