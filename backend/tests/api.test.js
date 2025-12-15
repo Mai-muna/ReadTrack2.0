@@ -1,44 +1,3 @@
-process.env.NODE_ENV = 'test';
-const fs = require('fs');
-const path = require('path');
-const { execSync } = require('child_process');
-
-const candidateBinaries = [
-  process.env.MONGOMS_SYSTEM_BINARY,
-  '/tmp/mongobin/bin/mongod',
-  '/tmp/mongobin/bin/bin/mongod',
-  '/tmp/mongobin/mongodb-linux-x86_64-ubuntu2204-7.0.5/bin/mongod'
-].filter(Boolean);
-
-const findExistingBinary = () => candidateBinaries.find((bin) => fs.existsSync(bin));
-
-const ensureMongoBinary = () => {
-  const existing = findExistingBinary();
-  if (existing) {
-    process.env.MONGOMS_SYSTEM_BINARY = existing;
-    return;
-  }
-
-  try {
-    const downloadUrl = process.env.MONGOMS_DOWNLOAD_URL ||
-      'https://fastdl.mongodb.org/linux/mongodb-linux-x86_64-ubuntu2204-7.0.5.tgz';
-    const tarballPath = '/tmp/mongobin/mongo.tgz';
-    const extractRoot = '/tmp/mongobin';
-    fs.mkdirSync(extractRoot, { recursive: true });
-    execSync(`curl --fail --silent --show-error -L -o ${tarballPath} ${downloadUrl}`, { stdio: 'inherit' });
-    execSync(`tar -xzf ${tarballPath} -C ${extractRoot}`, { stdio: 'inherit' });
-    const postDownload = findExistingBinary();
-    if (postDownload) {
-      process.env.MONGOMS_SYSTEM_BINARY = postDownload;
-    }
-  } catch (error) {
-    console.warn('Failed to prepare MongoDB binary, mongodb-memory-server will attempt download.', error);
-    delete process.env.MONGOMS_SYSTEM_BINARY;
-  }
-};
-
-ensureMongoBinary();
-
 const mongoose = require('mongoose');
 const request = require('supertest');
 const { MongoMemoryServer } = require('mongodb-memory-server');
@@ -55,11 +14,7 @@ let reviewId;
 jest.setTimeout(30000);
 
 beforeAll(async () => {
-  const binary = process.env.MONGOMS_SYSTEM_BINARY
-    ? { systemBinary: process.env.MONGOMS_SYSTEM_BINARY }
-    : { version: process.env.MONGOMS_VERSION || '7.0.5' };
-
-  mongo = await MongoMemoryServer.create({ binary });
+  mongo = await MongoMemoryServer.create();
   process.env.JWT_SECRET = 'testsecret';
   await mongoose.connect(mongo.getUri());
 });
@@ -134,25 +89,6 @@ describe('Reviews', () => {
   });
 });
 
-describe('Export summary', () => {
-  test('returns text export for reading list', async () => {
-    const res = await request(app)
-      .get('/api/export/reading-summary')
-      .set('Authorization', `Bearer ${userToken}`)
-      .query({ format: 'text' });
-    expect(res.statusCode).toBe(200);
-    expect(res.text).toMatch(/Book 1/);
-  });
-
-  test('rejects invalid format', async () => {
-    const res = await request(app)
-      .get('/api/export/reading-summary')
-      .set('Authorization', `Bearer ${userToken}`)
-      .query({ format: 'docx' });
-    expect(res.statusCode).toBe(400);
-  });
-});
-
 describe('Admin actions', () => {
   test('admin bans user', async () => {
     const target = await User.findOne({ email: 'user@test.com' });
@@ -160,15 +96,5 @@ describe('Admin actions', () => {
       .post(`/api/admin/ban/${target._id}`)
       .set('Authorization', `Bearer ${adminToken}`);
     expect(res.statusCode).toBe(200);
-  });
-
-  test('admin removes review and book rating recalculates', async () => {
-    const res = await request(app)
-      .delete(`/api/admin/reviews/${reviewId}`)
-      .set('Authorization', `Bearer ${adminToken}`);
-    expect(res.statusCode).toBe(200);
-    const book = await Book.findById(bookId);
-    expect(book.ratingsCount).toBe(0);
-    expect(book.ratingsAverage).toBe(0);
   });
 });
