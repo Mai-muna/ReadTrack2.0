@@ -17,11 +17,14 @@ const exportRoutes = require('./routes/exportRoutes');
 const app = express();
 app.use(express.json());
 app.use(cors());
+app.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 100 }));
 
+if (process.env.NODE_ENV !== 'test') {
+  mongoose.connect(process.env.MONGO_URI)
+    .then(() => console.log('✅ MongoDB connected'))
+    .catch(err => console.error('❌ Connection failed:', err.message));
+}
 
-mongoose.connect(process.env.MONGO_URI)
-  .then(() => console.log('✅ MongoDB connected'))
-  .catch(err => console.error('❌ Connection failed:', err.message));
 app.use('/api/books', bookRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/reading-list', readingListRoutes);
