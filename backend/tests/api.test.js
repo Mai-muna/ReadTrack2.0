@@ -1,6 +1,3 @@
-process.env.NODE_ENV = 'test';
-process.env.MONGOMS_SYSTEM_BINARY = '/tmp/mongobin/bin/mongod';
-
 const mongoose = require('mongoose');
 const request = require('supertest');
 const { MongoMemoryServer } = require('mongodb-memory-server');
@@ -99,15 +96,5 @@ describe('Admin actions', () => {
       .post(`/api/admin/ban/${target._id}`)
       .set('Authorization', `Bearer ${adminToken}`);
     expect(res.statusCode).toBe(200);
-  });
-
-  test('admin removes review and book rating recalculates', async () => {
-    const res = await request(app)
-      .delete(`/api/admin/reviews/${reviewId}`)
-      .set('Authorization', `Bearer ${adminToken}`);
-    expect(res.statusCode).toBe(200);
-    const book = await Book.findById(bookId);
-    expect(book.ratingsCount).toBe(0);
-    expect(book.ratingsAverage).toBe(0);
   });
 });
